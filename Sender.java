@@ -1,5 +1,5 @@
+import java.io.DataInputStream;
 import java.net.Socket;
-import java.util.Scanner;
 
 //'terminal client'
 public class Sender {
@@ -13,7 +13,7 @@ public class Sender {
 	
 	class MessageListener extends Thread{
 		Socket socket;
-		Scanner scInputStream;
+		DataInputStream dataIn;
 		
 		public MessageListener(Socket socket) {
 			this.socket = socket;
@@ -21,9 +21,9 @@ public class Sender {
 		
 		public void run() {
 			try {
-				scInputStream = new Scanner(socket.getInputStream());
+				dataIn = new DataInputStream(socket.getInputStream());
 				while(true) {
-					String message = 
+					//String message = 
 				}
 			}catch(Exception e) {
 				System.out.println("Error has occurred when listening for messages.");
