@@ -8,15 +8,18 @@ import java.util.Base64;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 //'terminal client'
 public class Sender {
+	//Variables
 	private static Socket socket;
 	private static DataInputStream dataIn;
 	private static DataOutputStream dataOut;
 	private static SecretKey symmetricKey;
 	
+	//Main
 	public static void main(String[] args) throws Exception{
 		System.out.println("Sender has started.");
 		System.out.println("Connecting to 0.0.0.0 port 1024");
@@ -27,7 +30,7 @@ public class Sender {
 		
 		//Generating asymmetric keys
 		System.out.println("Starting asymmetric encryption...");
-		System.out.println("Generating public and private keys");
+		System.out.println("Generating public and private keys.");
 		KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
 		keyPairGenerator.initialize(512); //Number of bits in both keys
 		KeyPair keyPair = keyPairGenerator.generateKeyPair();
@@ -48,7 +51,25 @@ public class Sender {
 		String symKeyString = new String(decryptAsymmetric(privKey, encryptedSymKeyString));
 		symmetricKey = stringToSecretKey(symKeyString);
 		System.out.println("Decrypted symmetric key.");
+		System.out.println();
+		
+		System.out.println("Sending message encrypted with the symmetric key.");
+		String message = "Lock the front door.";
+		byte[] encryptedMsg = encryptSymmetric(message.getBytes(), symmetricKey);
+		dataOut.writeInt(encryptedMsg.length);
+		dataOut.write(encryptedMsg);
+		System.out.println("Message sent.");
 	}
+	
+	//Methods
+	public static byte[] encryptSymmetric(byte[] data, SecretKey encryptionKey) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec("0102030405060708".getBytes());
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, iv);
+        byte[] encryptData = cipher.doFinal(data);
+
+        return encryptData;
+    }
 	
     public static byte[] decryptAsymmetric(/*byte[] privateKey,*/ PrivateKey key, byte[] inputData) throws Exception {
         //PrivateKey key = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(privateKey));

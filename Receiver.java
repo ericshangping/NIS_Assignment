@@ -9,14 +9,18 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 //'server'
 public class Receiver {
+	//Variables
 	private static ServerSocket serverSocket;
 	private static DataInputStream dataIn;
 	private static DataOutputStream dataOut;
 	private static SecretKey symmetricKey;
 	
+	//Main
 	public static void main(String[] args) throws Exception{
 		System.out.println("Server has started");
 		serverSocket = new ServerSocket(1024);
@@ -45,14 +49,31 @@ public class Receiver {
 		dataOut.writeInt(encryptedSymKeyString.length);
 		dataOut.write(encryptedSymKeyString);
 		
-		//otherstuff
+		System.out.println("Waiting for encrypted messages..");
+		int encrMsgLength = dataIn.readInt();
+		byte[] encryptedMsg = new byte[encrMsgLength];
+		dataIn.readFully(encryptedMsg, 0, encrMsgLength);
+		
+		String message = new String(decryptSymmetric(encryptedMsg, symmetricKey));
+		System.out.println(message);
 	}
 	
+	//Methods
 	public static SecretKey generateKey() throws NoSuchAlgorithmException {
         KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
         keyGenerator.init(128);
         SecretKey key = keyGenerator.generateKey();
         return key;
+    }
+	
+	public static byte[] decryptSymmetric(byte[] tmp, SecretKey encryptionKey) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec("0102030405060708".getBytes());
+        SecretKeySpec spec = new SecretKeySpec(encryptionKey.getEncoded(), "AES");
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, spec, iv);
+
+        //System.out.println(tmp.length);
+        return cipher.doFinal(tmp);
     }
 	
     public static byte[] encryptAsymmetric(/*byte[] publicKey,*/ PublicKey key, byte[] inputData) throws Exception {
