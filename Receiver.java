@@ -22,25 +22,25 @@ public class Receiver {
 	
 	//Main
 	public static void main(String[] args) throws Exception{
-		System.out.println("Server has started");
+		System.out.println("Receiver has started");
 		serverSocket = new ServerSocket(1024);
 		
 		System.out.println("Waiting for sender...");
 		Socket socket = serverSocket.accept();
 		dataIn = new DataInputStream(socket.getInputStream());
 		dataOut = new DataOutputStream(socket.getOutputStream());
-		System.out.println("Sender connected.");
+		System.out.println("Sender connected with IP: " + socket.getInetAddress());
 //		MessageListener listener = new MessageListener(socket);
 //		listener.start();
 		
-		System.out.println("Starting generation of symmetric key.");
-		symmetricKey = generateKey(); //symmetric key
-		String symmetricKeyString = keyToString(symmetricKey);
-		
-		System.out.println("Waiting for public key to encrypt and send the symmetric key...");
+		System.out.println("Waiting for public key from Sender...");
 		String publicKeyString = dataIn.readUTF();
 		PublicKey pubKey = stringToPublicKey(publicKeyString);
-		System.out.println("Received public key");
+		System.out.println("Received public key from Sender.");
+		
+		symmetricKey = generateKey(); //symmetric key
+		String symmetricKeyString = keyToString(symmetricKey);
+		System.out.println("Symmetric key generated.");
 		
 		System.out.println("Encrypting symmetric key with the public key.");
 		byte[] encryptedSymKeyString = encryptAsymmetric(pubKey, symmetricKeyString.getBytes());
@@ -49,13 +49,17 @@ public class Receiver {
 		dataOut.writeInt(encryptedSymKeyString.length);
 		dataOut.write(encryptedSymKeyString);
 		
-		System.out.println("Waiting for encrypted messages..");
-		int encrMsgLength = dataIn.readInt();
-		byte[] encryptedMsg = new byte[encrMsgLength];
-		dataIn.readFully(encryptedMsg, 0, encrMsgLength);
-		
-		String message = new String(decryptSymmetric(encryptedMsg, symmetricKey));
-		System.out.println(message);
+		String message = "";
+		while(!message.equals("q")) {
+			System.out.println("Waiting for encrypted messages...");
+			int encrMsgLength = dataIn.readInt();
+			byte[] encryptedMsg = new byte[encrMsgLength];
+			System.out.println("Received message: decrypting message...");
+			dataIn.readFully(encryptedMsg, 0, encrMsgLength);
+			
+			message = new String(decryptSymmetric(encryptedMsg, symmetricKey));
+			System.out.println("Received message: "+message);
+		}
 	}
 	
 	//Methods

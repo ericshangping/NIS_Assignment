@@ -5,6 +5,7 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Base64;
+import java.util.Scanner;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -18,9 +19,9 @@ public class Sender {
 	private static DataInputStream dataIn;
 	private static DataOutputStream dataOut;
 	private static SecretKey symmetricKey;
+	private static String message;
 	
-	//Main
-	public static void main(String[] args) throws Exception{
+	public Sender() throws Exception{
 		System.out.println("Sender has started.");
 		System.out.println("Connecting to 0.0.0.0 port 1024");
 		socket = new Socket("0.0.0.0", 1024);
@@ -53,15 +54,52 @@ public class Sender {
 		System.out.println("Decrypted symmetric key.");
 		System.out.println();
 		
-		System.out.println("Sending message encrypted with the symmetric key.");
-		String message = "Lock the front door.";
-		byte[] encryptedMsg = encryptSymmetric(message.getBytes(), symmetricKey);
-		dataOut.writeInt(encryptedMsg.length);
-		dataOut.write(encryptedMsg);
-		System.out.println("Message sent.");
+		System.out.println("Masking in progress. ");
+		System.out.println("Listening for user input..");
+		MessageListener mytypeFaker = new MessageListener();
+        mytypeFaker.start();
+        
+        message = "";
+		while(!message.equals("q")) {
+			boolean faked = false;
+			if(message.equals("")) {
+				message = GenerateFakeMSG();
+				faked = true;
+			}
+			
+			byte[] encryptedMsg = encryptSymmetric(message.getBytes(), symmetricKey);
+			dataOut.writeInt(encryptedMsg.length);
+			dataOut.write(encryptedMsg);
+			if(!faked) {
+				System.out.println("Message sent.");
+			}
+			
+			message = "";
+			Thread.sleep(5000);
+		}
+	
+	}
+	
+	//Main
+	public static void main(String[] args) throws Exception{
+		new Sender();
 	}
 	
 	//Methods
+    public static String GenerateFakeMSG() {
+        double x = (Math.random() * 200) + 1;
+        int string_length = (int) x;
+        String ALPHA_NUMERIC_STRING = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+        StringBuilder builder = new StringBuilder();
+        while (string_length-- != 0) {
+            int character = (int)(Math.random()*ALPHA_NUMERIC_STRING.length());
+            builder.append(ALPHA_NUMERIC_STRING.charAt(character));
+        }
+       // System.out.println("fake string: "  + builder.toString());
+        return builder.toString();
+      //return "dumMsg";
+    }
+	
 	public static byte[] encryptSymmetric(byte[] data, SecretKey encryptionKey) throws Exception {
         IvParameterSpec iv = new IvParameterSpec("0102030405060708".getBytes());
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -90,4 +128,20 @@ public class Sender {
 	public static String keyToString(PublicKey key) {
 		return Base64.getEncoder().encodeToString(key.getEncoded());
 	}
+	
+	class MessageListener extends Thread {
+
+        public void run() {
+            Scanner input = new Scanner(System.in);
+            while (message != "q") {
+                System.out.println("Please type mesage to send. (type q to close)");
+                message = input.nextLine();
+
+            }
+            input.close();
+        }
+
+    }
 }
+
+
