@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -22,6 +23,7 @@ public class Receiver {
 	
 	//Main
 	public static void main(String[] args) throws Exception{
+		
 		System.out.println("Receiver has started");
 		serverSocket = new ServerSocket(1024);
 		
@@ -44,22 +46,52 @@ public class Receiver {
 		
 		System.out.println("Encrypting symmetric key with the public key.");
 		byte[] encryptedSymKeyString = encryptAsymmetric(pubKey, symmetricKeyString.getBytes());
-		System.out.println("Sending encrypted symmetric key.");
+		System.out.println("Sending encrypted symmetric key.\n");
 		//System.out.println("TEST: encrypted symmetric key: "+new String(encryptedSymKeyString)); //testprint
 		dataOut.writeInt(encryptedSymKeyString.length);
 		dataOut.write(encryptedSymKeyString);
 		
 		String message = "";
 		while(!message.equals("q")) {
+			//Send nonce
+			System.out.println("Sending nonce...");
+			String nonce = generateNonce();
+			System.out.println("Generated nonce: " + nonce);
+			byte[] encrNonce = encryptSymmetric(nonce.getBytes(), symmetricKey);
+			dataOut.writeInt(encrNonce.length);
+			dataOut.write(encrNonce);
+			
 			System.out.println("Waiting for encrypted messages...");
 			int encrMsgLength = dataIn.readInt();
 			byte[] encryptedMsg = new byte[encrMsgLength];
 			System.out.println("Received message: decrypting message...");
 			dataIn.readFully(encryptedMsg, 0, encrMsgLength);
 			
+			int hashLength = dataIn.readInt();
+			byte[] encrHash = new byte[hashLength];
+			dataIn.readFully(encrHash, 0, hashLength);
+			
 			message = new String(decryptSymmetric(encryptedMsg, symmetricKey));
-			System.out.println("Received message: "+message);
+			byte[] hash = decryptSymmetric(encrHash, symmetricKey);
+			
+			if(!doesMesageMatchHash(message, new String(hash))) {
+				System.out.println("Hash mismatch. Potential message modification detected.");
+			}
+			else {
+				System.out.println("Hash matched, checking nonce.");
+				String receivedNonce = message.substring(0, 8);
+				message = message.substring(8);
+				System.out.println("Received nonce: "+receivedNonce);
+				if(receivedNonce.equals(nonce)) {
+					System.out.println("Nonces verified.");
+					System.out.println("Received message: "+message);
+				}
+				else {
+					System.out.println("Replay attack detected! Message ignored.");
+				}
+			}
 		}
+		System.out.println("Quit request, terminating.");
 	}
 	
 	//Methods
@@ -68,6 +100,15 @@ public class Receiver {
         keyGenerator.init(128);
         SecretKey key = keyGenerator.generateKey();
         return key;
+    }
+	
+	public static byte[] encryptSymmetric(byte[] data, SecretKey encryptionKey) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec("0102030405060708".getBytes());
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, iv);
+        byte[] encryptData = cipher.doFinal(data);
+
+        return encryptData;
     }
 	
 	public static byte[] decryptSymmetric(byte[] tmp, SecretKey encryptionKey) throws Exception {
@@ -99,6 +140,26 @@ public class Receiver {
 	public static String keyToString(SecretKey secretKey) {
 		return Base64.getEncoder().encodeToString(secretKey.getEncoded());
 	}
+	
+	public static String generateNonce() {
+		String nonce = "";
+		for(int i=0; i<8; i++) {
+			String num = ""+((int)(Math.random()*10));
+			nonce += num;
+		}
+		return nonce;
+	}
+	
+	public static byte[] generateHash(String mesage) throws Exception{
+        MessageDigest md;
+        md = MessageDigest.getInstance("MD5");
+        byte[] thehashedMesage = md.digest(mesage.getBytes());
+        return thehashedMesage;
+    }
+	
+	public static boolean doesMesageMatchHash(String mesage, String md5HashedString) throws Exception{
+        return new String(generateHash(mesage)).equals(md5HashedString);
+    }
 }
 
 

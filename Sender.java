@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.Socket;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Base64;
@@ -47,7 +48,7 @@ public class Sender {
 		byte[] encryptedSymKeyString = new byte[encrSymKeyLength];
 		dataIn.readFully(encryptedSymKeyString, 0, encrSymKeyLength);
 		System.out.println("Encrypted symmetric key received.");
-		//System.out.println("TEST: encrypted symmetric key: "+new String(encryptedSymKeyString)); //testprint
+	
 		
 		String symKeyString = new String(decryptAsymmetric(privKey, encryptedSymKeyString));
 		symmetricKey = stringToSecretKey(symKeyString);
@@ -61,23 +62,42 @@ public class Sender {
         
         message = "";
 		while(!message.equals("q")) {
+			message = "";
+			Thread.sleep(5000);
+			
+			System.out.println("Waiting for encrypted nonce...");
+			int encrNonceLength = dataIn.readInt();
+			byte[] encryptedNonce = new byte[encrNonceLength];
+			System.out.println("Received nonce: decrypting nonce...");
+			dataIn.readFully(encryptedNonce, 0, encrNonceLength);
+			String nonce = new String(decryptSymmetric(encryptedNonce, symmetricKey));
+			
+			
 			boolean faked = false;
 			if(message.equals("")) {
 				message = GenerateFakeMSG();
 				faked = true;
 			}
 			
+			message = nonce + message;
+			
+			System.out.println("Generating message hash.");
+			System.out.println("Encrypting message and hash.");
 			byte[] encryptedMsg = encryptSymmetric(message.getBytes(), symmetricKey);
+			byte[] encrHash = encryptSymmetric(generateHash(message), symmetricKey);
 			dataOut.writeInt(encryptedMsg.length);
 			dataOut.write(encryptedMsg);
+			dataOut.writeInt(encrHash.length);
+			dataOut.write(encrHash);
 			if(!faked) {
 				System.out.println("Message sent.");
 			}
 			
-			message = "";
-			Thread.sleep(5000);
+			message = message.substring(8);
+			System.out.println(message);
 		}
-	
+		
+		System.out.println("Quit request, terminating.");
 	}
 	
 	//Main
@@ -109,6 +129,16 @@ public class Sender {
         return encryptData;
     }
 	
+	public static byte[] decryptSymmetric(byte[] tmp, SecretKey encryptionKey) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec("0102030405060708".getBytes());
+        SecretKeySpec spec = new SecretKeySpec(encryptionKey.getEncoded(), "AES");
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, spec, iv);
+
+        //System.out.println(tmp.length);
+        return cipher.doFinal(tmp);
+    }
+	
     public static byte[] decryptAsymmetric(/*byte[] privateKey,*/ PrivateKey key, byte[] inputData) throws Exception {
         //PrivateKey key = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(privateKey));
 
@@ -129,18 +159,24 @@ public class Sender {
 		return Base64.getEncoder().encodeToString(key.getEncoded());
 	}
 	
+	public static byte[] generateHash(String mesage) throws Exception{
+        MessageDigest md;
+        md = MessageDigest.getInstance("MD5");
+        byte[] thehashedMesage = md.digest(mesage.getBytes());
+        return thehashedMesage;
+    }
+	
 	class MessageListener extends Thread {
 
         public void run() {
             Scanner input = new Scanner(System.in);
-            while (message != "q") {
+            while (!message.equals("q")) {
                 System.out.println("Please type mesage to send. (type q to close)");
                 message = input.nextLine();
-
             }
             input.close();
+            System.out.println("listener closed");
         }
-
     }
 }
 
