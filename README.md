@@ -13,3 +13,4 @@ The project consists of a Sender class and a Receiver class.
 	In the Sender program: a message is sent every 5 seconds, you are able to type a message to encrypt and send by entering your message and pressing <Enter>.
 		Note that once the 5 seconds have elapsed, the system logs will interrupt and make it seem like your input has disappeared, but the input will not be lost and the full message will still be sent once you hit <Enter>.
 	Enter the message 'q' on the Sender side to terminate both the Sender and Receiver.
+	Type 'make clean' to remove all class files from the directory.
